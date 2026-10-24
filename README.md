@@ -30,3 +30,7 @@ python3 -m http.server 8000
 - **Rendering:** codes come from [qrcodejs](https://github.com/davidshimjs/qrcodejs) 1.0.0, loaded from cdnjs with a Subresource Integrity hash, so the browser refuses a tampered copy.
 - **Download:** redraws the code onto a padded canvas and saves it as a PNG.
 - **Copy:** uses the asynchronous Clipboard API with a PNG `ClipboardItem`.
+
+## License
+
+[MIT](LICENSE)
