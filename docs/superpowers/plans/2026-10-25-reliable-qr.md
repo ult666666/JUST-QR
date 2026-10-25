@@ -39,3 +39,15 @@
 - [x] Run `npm test`. Expected: every Chromium scenario passes, no page errors in recovered flows.
 - [x] Update README with exact setup/test commands and a short invalid → long → valid → download/copy scenario; document HTTP(S) URL scope and clipboard constraints.
 - [x] Run `npm ci && npm test` and `git diff --check`; inspect the final diff; commit with `fix: recover QR generation errors and pad clipboard exports`.
+
+### Task 2: Run the browser scenarios in read-only CI
+
+**Files:** Create `.github/workflows/qr.yml`; modify `README.md`.
+
+**Interfaces:** Reuse `npm test` and the existing pinned Playwright dependencies. No product behavior changes.
+
+- [x] Add push/pull-request triggers for `main` and manual dispatch, `contents: read`, an eight-minute timeout, checkout without persisted credentials, and the trusted immutable checkout/setup-node/setup-python pins from the portfolio workflow.
+- [x] Configure Node 24/Python 3.13 setup, script-free `npm ci`, headless Chromium installation with system dependencies, and `npm test`; add no deployment or credential steps.
+- [x] Document the actual nine scenarios in CI without a live-pass claim.
+- [x] Validate with the existing actionlint binary, rerun all nine browser tests, and check the diff; commit/push to the existing draft PR.
+After pushing, read exact-head CI checks through the Code Review connector and report the head for parent review before merge.

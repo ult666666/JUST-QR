@@ -55,6 +55,8 @@ npm test
 
 [`tests/qr.spec.mjs`](tests/qr.spec.mjs) serves the exact SRI-pinned QR library locally, so the tests need no external network after installation. Chromium exercises real generation, invalid/oversized-input recovery, Enter/Clear, Unicode URLs, unavailable-library feedback and clipboard failure. The suite independently decodes downloaded and copied PNGs and checks every pixel in their white quiet zones. Only the operating-system clipboard boundary is replaced; the QR renderer, canvas, PNG blobs and decoder are real. Development dependencies do not change the static page's deployment.
 
+The read-only [QR browser checks workflow](.github/workflows/qr.yml) runs these nine scenarios for pull requests targeting `main`, pushes to `main`, and manual runs, using Node.js 24 and Python 3.13. It installs the pinned test dependencies without package install scripts, then runs headless Chromium; it has no deployment steps.
+
 ## License
 
 [MIT](LICENSE)
