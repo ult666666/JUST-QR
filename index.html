@@ -115,6 +115,13 @@
     opacity: 0.7;
   }
 
+  .input-error {
+    color: #ffb4b4;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: -20px;
+  }
+
   .output-area {
     display: flex;
     flex-direction: column;
@@ -257,11 +264,12 @@
   </div>
 
   <div class="input-group">
-    <input type="text" id="urlInput" placeholder="paste your URL here" aria-label="URL to encode" inputmode="url" spellcheck="false" autocomplete="off">
+    <input type="text" id="urlInput" placeholder="paste your URL here" aria-label="URL to encode" aria-describedby="urlError" aria-invalid="false" inputmode="url" spellcheck="false" autocomplete="off">
     <button onclick="generateQR()">Generate</button>
   </div>
+  <p id="urlError" class="input-error" role="alert" hidden></p>
 
-  <div class="output-area" id="outputArea">
+  <div class="output-area" id="outputArea" inert>
     <div class="qr-frame">
       <div id="qrCode"></div>
     </div>
@@ -281,8 +289,10 @@
 <script>
   let qrInstance = null;
   let currentURL = '';
+  let toastTimeout;
 
   const urlInput = document.getElementById('urlInput');
+  const urlError = document.getElementById('urlError');
   const outputArea = document.getElementById('outputArea');
   const qrCodeEl = document.getElementById('qrCode');
   const urlPreview = document.getElementById('urlPreview');
@@ -292,50 +302,108 @@
   });
 
   function generateQR() {
-    let url = urlInput.value.trim();
-    if (!url) {
-      showToast('Enter a URL first');
+    clearResult();
+    clearError();
+    clearToast();
+
+    const input = urlInput.value.trim();
+    if (!input) {
+      showInputError('Enter a URL first.');
       return;
     }
 
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
-      urlInput.value = url;
+    let url;
+    try {
+      // A host with a port is schemeless; other explicit schemes must be HTTP(S).
+      const hostWithPort = /^(?:localhost|[^\s/?#:@]+\.[^\s/?#:@]+):\d+(?:[/?#]|$)/i.test(input);
+      const explicitScheme = /^[a-z][a-z\d+.-]*:/i.test(input);
+      if (/[\s\\]/u.test(input) || (explicitScheme && !hostWithPort && !/^https?:\/\//i.test(input))) {
+        throw new Error('invalid URL');
+      }
+      const parsed = new URL(/^https?:\/\//i.test(input) ? input : 'https://' + input);
+      if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) {
+        throw new Error('invalid URL');
+      }
+      // Canonical escaping also avoids qrcodejs's non-ASCII byte-count mismatch.
+      url = parsed.href;
+    } catch {
+      showInputError('Enter a valid HTTP or HTTPS URL without spaces or embedded credentials.');
+      return;
+    }
+
+    if (typeof QRCode === 'undefined') {
+      showInputError('The QR generator could not load. Check your connection and reload the page.');
+      return;
+    }
+
+    try {
+      qrInstance = new QRCode(qrCodeEl, {
+        text: url,
+        width: 240,
+        height: 240,
+        colorDark: '#0a0a0a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    } catch {
+      // qrcodejs can throw a TypeError as well as "Too long data" at capacity.
+      showInputError('This URL is too long for a QR code. Shorten it and try again.');
+      return;
     }
 
     currentURL = url;
-
-    qrCodeEl.innerHTML = '';
-    qrInstance = new QRCode(qrCodeEl, {
-      text: url,
-      width: 240,
-      height: 240,
-      colorDark: '#0a0a0a',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.H
-    });
-
+    urlInput.value = url;
     urlPreview.textContent = url.length > 60 ? url.substring(0, 60) + '...' : url;
+    outputArea.removeAttribute('inert');
     outputArea.classList.add('visible');
   }
 
-  function downloadQR() {
+  function clearResult() {
+    qrInstance = null;
+    currentURL = '';
+    qrCodeEl.innerHTML = '';
+    qrCodeEl.removeAttribute('title');
+    urlPreview.textContent = '';
+    outputArea.classList.remove('visible');
+    outputArea.setAttribute('inert', '');
+  }
+
+  function clearError() {
+    urlError.textContent = '';
+    urlError.hidden = true;
+    urlInput.setAttribute('aria-invalid', 'false');
+  }
+
+  function showInputError(message) {
+    clearResult();
+    urlError.textContent = message;
+    urlError.hidden = false;
+    urlInput.setAttribute('aria-invalid', 'true');
+  }
+
+  function exportCanvas() {
     const canvas = qrCodeEl.querySelector('canvas');
     if (!canvas) {
       showToast('Generate a QR code first');
-      return;
+      return null;
     }
 
     const pad = 40;
     const size = canvas.width + pad * 2;
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = size;
-    exportCanvas.height = size;
-    const ctx = exportCanvas.getContext('2d');
+    const paddedCanvas = document.createElement('canvas');
+    paddedCanvas.width = size;
+    paddedCanvas.height = size;
+    const ctx = paddedCanvas.getContext('2d');
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, size, size);
     ctx.drawImage(canvas, pad, pad);
+    return paddedCanvas;
+  }
+
+  function downloadQR() {
+    const canvas = exportCanvas();
+    if (!canvas) return;
 
     const link = document.createElement('a');
     const safeName = currentURL
@@ -343,20 +411,18 @@
       .replace(/[^a-zA-Z0-9]/g, '_')
       .substring(0, 30);
     link.download = `qr_${safeName}.png`;
-    link.href = exportCanvas.toDataURL('image/png');
+    link.href = canvas.toDataURL('image/png');
     link.click();
     showToast('PNG downloaded');
   }
 
   async function copyPNG() {
-    const canvas = qrCodeEl.querySelector('canvas');
-    if (!canvas) {
-      showToast('Generate a QR code first');
-      return;
-    }
+    const canvas = exportCanvas();
+    if (!canvas) return;
 
     try {
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('PNG encoding failed');
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob })
       ]);
@@ -368,17 +434,24 @@
 
   function resetAll() {
     urlInput.value = '';
-    currentURL = '';
-    qrCodeEl.innerHTML = '';
-    outputArea.classList.remove('visible');
+    clearResult();
+    clearError();
+    clearToast();
     urlInput.focus();
   }
 
+  function clearToast() {
+    clearTimeout(toastTimeout);
+    document.getElementById('toast').classList.remove('show');
+    document.getElementById('toast').textContent = '';
+  }
+
   function showToast(msg) {
+    clearTimeout(toastTimeout);
     const toast = document.getElementById('toast');
     toast.textContent = msg;
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
+    toastTimeout = setTimeout(() => toast.classList.remove('show'), 2000);
   }
 
   urlInput.focus();
