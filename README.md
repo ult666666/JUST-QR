@@ -13,7 +13,7 @@ A minimal QR code generator that runs entirely in your browser. No ads, no login
 - **Scans reliably.** Codes use error-correction level H, so they still scan with roughly 30% of the symbol damaged or covered.
 - **Download PNG.** Exports the code with a white quiet zone around it, named after the URL, for example `qr_github_com_ult666666_JUST_QR.png`.
 - **Copy to clipboard.** Copies the same padded PNG as the download, ready to paste into a document or chat. Both are 320×320 pixels with a 40-pixel white quiet zone. If the browser blocks image copying, it suggests downloading instead.
-- **Private by design.** There is no backend: the URL you enter never leaves your browser. The page loads only the QR library and its fonts from public CDNs.
+- **Private by design.** There is no backend: the URL you enter never leaves your browser. The page loads two things from public CDNs: the QR library (from cdnjs, pinned with a Subresource Integrity hash) and two Google Fonts.
 
 ## Run it locally
 
