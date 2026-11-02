@@ -1,29 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
 import { PNG } from 'pngjs';
 import jsQR from 'jsqr';
 
-const library = await readFile(new URL('../node_modules/qrcodejs/qrcode.min.js', import.meta.url));
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
-// The production CDN asset is fulfilled with the identical real bytes, never a QR stub.
+// The page and its encoder are served from this folder; the only external requests are Google
+// Fonts, which are aborted so tests need no network. Page errors and CSP violations are collected.
 async function openApp(page, { missingLibrary = false } = {}) {
+  const origin = new URL(test.info().project.use.baseURL).origin;
   const pageErrors = [];
+  const external = [];
   page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('console', message => {
+    if (/Content Security Policy|Refused to/i.test(message.text())) pageErrors.push(message.text());
+  });
   await page.route('**/*', route => {
-    const url = route.request().url();
-    if (url.startsWith('http://127.0.0.1:8096/')) return route.continue();
-    if (url === 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js' && !missingLibrary) {
-      return route.fulfill({
-        body: library,
-        contentType: 'application/javascript',
-        headers: { 'access-control-allow-origin': '*' },
-      });
-    }
-    return route.abort(); // No fonts or other external network dependency in tests.
+    const url = new URL(route.request().url());
+    if (url.origin === origin && !(missingLibrary && url.pathname === '/qr.js')) return route.continue();
+    if (url.origin !== origin) external.push(url.href);
+    return route.abort();
   });
   await page.goto('/');
+  page.externalRequests = external;
   return pageErrors;
 }
 
@@ -33,13 +32,13 @@ async function generate(page, value, enter = false) {
   else await page.getByRole('button', { name: 'Generate', exact: true }).click();
 }
 
-function checkPNG(bytes, payload) {
+function checkPNG(bytes, payload, { size = 320 } = {}) {
   const png = PNG.sync.read(bytes);
-  expect(png.width).toBe(320);
-  expect(png.height).toBe(320);
+  if (size !== null) expect(png.width).toBe(size);
+  expect(png.height).toBe(png.width);
   for (let y = 0; y < png.height; y++) {
     for (let x = 0; x < png.width; x++) {
-      if (x >= 40 && x < 280 && y >= 40 && y < 280) continue;
+      if (x >= 40 && x < png.width - 40 && y >= 40 && y < png.height - 40) continue;
       const offset = (y * png.width + x) * 4;
       if (!png.data.subarray(offset, offset + 4).equals(Buffer.from([255, 255, 255, 255]))) {
         throw new Error(`The quiet zone is not opaque white at ${x},${y}`);
@@ -76,9 +75,16 @@ async function captureClipboard(page) {
   return Buffer.from(await page.evaluate(() => window.copiedPNG));
 }
 
-test('local QR fixture matches the page SRI pin', () => {
-  const actual = createHash('sha512').update(library).digest('base64');
-  expect(html).toContain(`integrity="sha512-${actual}"`);
+test('the page loads no third-party script and a CSP allows only its own', async ({ page }) => {
+  expect(html).not.toMatch(/<script[^>]+src="(?:https?:)?\/\//i);
+  expect(html).toContain("script-src 'self'");
+  expect(html).not.toMatch(/onclick=|style="/i);
+  const errors = await openApp(page);
+  await generate(page, 'example.com/csp');
+  checkPNG((await downloadPNG(page)).bytes, 'https://example.com/csp');
+  // Only the Google Fonts stylesheet is requested from another origin.
+  expect(page.externalRequests.every(url => url.startsWith('https://fonts.googleapis.com/'))).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test('Enter generates a real downloadable QR for a schemeless URL', async ({ page }) => {
@@ -128,6 +134,31 @@ test('empty input explains the problem and Clear resets a recovered result', asy
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('status')).toBeEmpty();
   await expect(page.locator('#qrCode canvas')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('error correction level is selectable and a lower level fits a longer URL', async ({ page }) => {
+  const errors = await openApp(page);
+  const level = page.getByRole('combobox', { name: 'Error correction' });
+  await expect(level).toHaveValue('H');
+  const long = `https://example.com/?q=${'a'.repeat(1400)}`;
+  await generate(page, long);
+  await expect(page.getByRole('alert')).toContainText(/lower level/i);
+  await level.selectOption('L');
+  await generate(page, long);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const large = checkPNG((await downloadPNG(page)).bytes, long, { size: null });
+  expect(large.width).toBeGreaterThan(320);
+  // Changing the level regenerates the shown code; a short URL keeps the 320-pixel export.
+  await generate(page, 'example.com/levels');
+  const sizes = {};
+  for (const value of ['L', 'M', 'Q', 'H']) {
+    await level.selectOption(value);
+    await expect(page.locator('#qrCode canvas')).toHaveCount(1);
+    checkPNG((await downloadPNG(page)).bytes, 'https://example.com/levels');
+    sizes[value] = await page.locator('#qrCode canvas').evaluate(canvas => canvas.width);
+  }
+  expect(Object.values(sizes)).toEqual([240, 240, 240, 240]);
   expect(errors).toEqual([]);
 });
 

@@ -1,6 +1,7 @@
 {
   "name": "just-qr",
   "private": true,
+  "type": "module",
   "scripts": {
     "test": "playwright test"
   },

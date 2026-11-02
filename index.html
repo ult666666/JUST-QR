@@ -5,255 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JUST QR</title>
 <meta name="description" content="A minimal QR code generator that runs entirely in your browser. No ads, no login, no analytics.">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; base-uri 'none'; form-action 'none'">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #0a0a0a;
-    --surface: #141414;
-    --border: #222;
-    --border-focus: #444;
-    --text: #e8e8e8;
-    --text-dim: #666;
-    --accent: #f5f5f5;
-    --qr-bg: #ffffff;
-  }
-
-  body {
-    font-family: 'Instrument Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    overflow-x: hidden;
-  }
-
-  .container {
-    width: 100%;
-    max-width: 480px;
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-
-  .brand h1 {
-    font-family: 'DM Mono', monospace;
-    font-size: 32px;
-    font-weight: 500;
-    letter-spacing: -1px;
-    color: var(--accent);
-  }
-
-  .brand span {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
-
-  .input-group {
-    display: flex;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    transition: border-color 0.2s;
-    background: var(--surface);
-  }
-
-  .input-group:focus-within {
-    border-color: var(--border-focus);
-  }
-
-  .input-group input {
-    flex: 1;
-    padding: 16px 20px;
-    font-family: 'DM Mono', monospace;
-    font-size: 14px;
-    background: transparent;
-    border: none;
-    color: var(--text);
-    outline: none;
-    min-width: 0;
-  }
-
-  .input-group input::placeholder {
-    color: var(--text-dim);
-  }
-
-  .input-group button {
-    padding: 16px 28px;
-    font-family: 'Instrument Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-  }
-
-  .input-group button:hover {
-    opacity: 0.85;
-  }
-
-  .input-group button:active {
-    opacity: 0.7;
-  }
-
-  .input-error {
-    color: #ffb4b4;
-    font-size: 13px;
-    line-height: 1.5;
-    margin-top: -20px;
-  }
-
-  .output-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
-    opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 0.4s ease, transform 0.4s ease;
-    pointer-events: none;
-  }
-
-  .output-area.visible {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: all;
-  }
-
-  .qr-frame {
-    background: var(--qr-bg);
-    padding: 28px;
-    border-radius: 16px;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px rgba(0,0,0,0.5);
-    position: relative;
-  }
-
-  .qr-frame canvas {
-    display: block !important;
-    border-radius: 4px;
-  }
-
-  .qr-frame img {
-    display: none !important;
-  }
-
-  .actions {
-    display: flex;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .actions button {
-    flex: 1;
-    padding: 14px 20px;
-    font-family: 'Instrument Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.3px;
-  }
-
-  .btn-download {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-  }
-
-  .btn-download:hover { opacity: 0.85; }
-
-  .btn-copy {
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-
-  .btn-copy:hover {
-    border-color: var(--border-focus);
-    background: var(--surface);
-  }
-
-  .btn-reset {
-    background: transparent;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-  }
-
-  .btn-reset:hover {
-    border-color: var(--border-focus);
-    color: var(--text);
-  }
-
-  .url-preview {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: center;
-    padding: 0 20px;
-  }
-
-  .toast {
-    position: fixed;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: var(--accent);
-    color: var(--bg);
-    padding: 10px 24px;
-    border-radius: 8px;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    opacity: 0;
-    transition: all 0.3s ease;
-    pointer-events: none;
-    z-index: 10;
-  }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  .footer {
-    margin-top: 48px;
-    text-align: center;
-    font-size: 11px;
-    color: var(--text-dim);
-    font-family: 'DM Mono', monospace;
-    letter-spacing: 1px;
-  }
-
-  @media (max-width: 500px) {
-    .brand h1 { font-size: 26px; }
-    .input-group input { padding: 14px 16px; font-size: 13px; }
-    .input-group button { padding: 14px 20px; }
-    .qr-frame { padding: 20px; }
-  }
-</style>
+<link href="style.css" rel="stylesheet">
+<script type="module" src="app.js"></script>
 </head>
 <body>
 
@@ -265,9 +20,18 @@
 
   <div class="input-group">
     <input type="text" id="urlInput" placeholder="paste your URL here" aria-label="URL to encode" aria-describedby="urlError" aria-invalid="false" inputmode="url" spellcheck="false" autocomplete="off">
-    <button onclick="generateQR()">Generate</button>
+    <button id="generate" type="button">Generate</button>
   </div>
   <p id="urlError" class="input-error" role="alert" hidden></p>
+  <div class="options">
+    <label for="level">Error correction</label>
+    <select id="level">
+      <option value="L">L · recovers about 7%</option>
+      <option value="M">M · recovers about 15%</option>
+      <option value="Q">Q · recovers about 25%</option>
+      <option value="H" selected>H · recovers about 30%</option>
+    </select>
+  </div>
 
   <div class="output-area" id="outputArea" inert>
     <div class="qr-frame">
@@ -275,187 +39,17 @@
     </div>
     <div class="url-preview" id="urlPreview"></div>
     <div class="actions">
-      <button class="btn-download" onclick="downloadQR()">Download PNG</button>
-      <button class="btn-copy" onclick="copyPNG()">Copy to Clipboard</button>
-      <button class="btn-reset" onclick="resetAll()">Clear</button>
+      <button class="btn-download" id="download" type="button">Download PNG</button>
+      <button class="btn-copy" id="copy" type="button">Copy to Clipboard</button>
+      <button class="btn-reset" id="clear" type="button">Clear</button>
     </div>
   </div>
 
-  <div class="footer">PASTE. GENERATE. DONE.<br><span style="font-size:9px;color:#444;margin-top:6px;display:inline-block;">generated by Charles Dai</span></div>
+  <div class="footer">PASTE. GENERATE. DONE.<br><span class="credit">generated by Charles Dai</span></div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script>
-  let qrInstance = null;
-  let currentURL = '';
-  let toastTimeout;
-
-  const urlInput = document.getElementById('urlInput');
-  const urlError = document.getElementById('urlError');
-  const outputArea = document.getElementById('outputArea');
-  const qrCodeEl = document.getElementById('qrCode');
-  const urlPreview = document.getElementById('urlPreview');
-
-  urlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') generateQR();
-  });
-
-  function generateQR() {
-    clearResult();
-    clearError();
-    clearToast();
-
-    const input = urlInput.value.trim();
-    if (!input) {
-      showInputError('Enter a URL first.');
-      return;
-    }
-
-    let url;
-    try {
-      // A host with a port is schemeless; other explicit schemes must be HTTP(S).
-      const hostWithPort = /^(?:localhost|[^\s/?#:@]+\.[^\s/?#:@]+):\d+(?:[/?#]|$)/i.test(input);
-      const explicitScheme = /^[a-z][a-z\d+.-]*:/i.test(input);
-      if (/[\s\\]/u.test(input) || (explicitScheme && !hostWithPort && !/^https?:\/\//i.test(input))) {
-        throw new Error('invalid URL');
-      }
-      const parsed = new URL(/^https?:\/\//i.test(input) ? input : 'https://' + input);
-      if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) {
-        throw new Error('invalid URL');
-      }
-      // Canonical escaping also avoids qrcodejs's non-ASCII byte-count mismatch.
-      url = parsed.href;
-    } catch {
-      showInputError('Enter a valid HTTP or HTTPS URL without spaces or embedded credentials.');
-      return;
-    }
-
-    if (typeof QRCode === 'undefined') {
-      showInputError('The QR generator could not load. Check your connection and reload the page.');
-      return;
-    }
-
-    try {
-      qrInstance = new QRCode(qrCodeEl, {
-        text: url,
-        width: 240,
-        height: 240,
-        colorDark: '#0a0a0a',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H
-      });
-    } catch {
-      // qrcodejs can throw a TypeError as well as "Too long data" at capacity.
-      showInputError('This URL is too long for a QR code. Shorten it and try again.');
-      return;
-    }
-
-    currentURL = url;
-    urlInput.value = url;
-    urlPreview.textContent = url.length > 60 ? url.substring(0, 60) + '...' : url;
-    outputArea.removeAttribute('inert');
-    outputArea.classList.add('visible');
-  }
-
-  function clearResult() {
-    qrInstance = null;
-    currentURL = '';
-    qrCodeEl.innerHTML = '';
-    qrCodeEl.removeAttribute('title');
-    urlPreview.textContent = '';
-    outputArea.classList.remove('visible');
-    outputArea.setAttribute('inert', '');
-  }
-
-  function clearError() {
-    urlError.textContent = '';
-    urlError.hidden = true;
-    urlInput.setAttribute('aria-invalid', 'false');
-  }
-
-  function showInputError(message) {
-    clearResult();
-    urlError.textContent = message;
-    urlError.hidden = false;
-    urlInput.setAttribute('aria-invalid', 'true');
-  }
-
-  function exportCanvas() {
-    const canvas = qrCodeEl.querySelector('canvas');
-    if (!canvas) {
-      showToast('Generate a QR code first');
-      return null;
-    }
-
-    const pad = 40;
-    const size = canvas.width + pad * 2;
-    const paddedCanvas = document.createElement('canvas');
-    paddedCanvas.width = size;
-    paddedCanvas.height = size;
-    const ctx = paddedCanvas.getContext('2d');
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    ctx.drawImage(canvas, pad, pad);
-    return paddedCanvas;
-  }
-
-  function downloadQR() {
-    const canvas = exportCanvas();
-    if (!canvas) return;
-
-    const link = document.createElement('a');
-    const safeName = currentURL
-      .replace(/^https?:\/\//, '')
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .substring(0, 30);
-    link.download = `qr_${safeName}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    showToast('PNG downloaded');
-  }
-
-  async function copyPNG() {
-    const canvas = exportCanvas();
-    if (!canvas) return;
-
-    try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error('PNG encoding failed');
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ]);
-      showToast('Copied to clipboard');
-    } catch {
-      showToast('Copy failed. Try download instead.');
-    }
-  }
-
-  function resetAll() {
-    urlInput.value = '';
-    clearResult();
-    clearError();
-    clearToast();
-    urlInput.focus();
-  }
-
-  function clearToast() {
-    clearTimeout(toastTimeout);
-    document.getElementById('toast').classList.remove('show');
-    document.getElementById('toast').textContent = '';
-  }
-
-  function showToast(msg) {
-    clearTimeout(toastTimeout);
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.classList.add('show');
-    toastTimeout = setTimeout(() => toast.classList.remove('show'), 2000);
-  }
-
-  urlInput.focus();
-</script>
 
 </body>
 </html>
