@@ -5,8 +5,8 @@ import jsQR from 'jsqr';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
-// The page and its encoder are served from this folder; the only external requests are Google
-// Fonts, which are aborted so tests need no network. Page errors and CSP violations are collected.
+// The page and its encoder are served from this folder. Any request to another origin is recorded
+// and aborted, so tests need no network. Page errors and CSP violations are collected.
 async function openApp(page, { missingLibrary = false } = {}) {
   const origin = new URL(test.info().project.use.baseURL).origin;
   const pageErrors = [];
@@ -70,20 +70,21 @@ async function captureClipboard(page) {
       },
     });
   });
-  await page.getByRole('button', { name: 'Copy to Clipboard' }).click();
+  await page.getByRole('button', { name: 'Copy image' }).click();
   await expect(page.getByRole('status')).toHaveText('Copied to clipboard');
   return Buffer.from(await page.evaluate(() => window.copiedPNG));
 }
 
-test('the page loads no third-party script and a CSP allows only its own', async ({ page }) => {
+test('the page loads nothing from another origin and a CSP allows only its own scripts', async ({ page }) => {
   expect(html).not.toMatch(/<script[^>]+src="(?:https?:)?\/\//i);
+  expect(html).not.toMatch(/<(?:link|img|iframe|source)[^>]+(?:href|src)="(?:https?:)?\/\//i);
   expect(html).toContain("script-src 'self'");
   expect(html).not.toMatch(/onclick=|style="/i);
   const errors = await openApp(page);
   await generate(page, 'example.com/csp');
   checkPNG((await downloadPNG(page)).bytes, 'https://example.com/csp');
-  // Only the Google Fonts stylesheet is requested from another origin.
-  expect(page.externalRequests.every(url => url.startsWith('https://fonts.googleapis.com/'))).toBe(true);
+  // Nothing is requested from another origin.
+  expect(page.externalRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
 
@@ -213,13 +214,13 @@ test('clipboard denial and empty PNG give download guidance without page errors'
     configurable: true,
     value: { write: async () => { throw new DOMException('Denied', 'NotAllowedError'); } },
   }));
-  await page.getByRole('button', { name: 'Copy to Clipboard' }).click();
+  await page.getByRole('button', { name: 'Copy image' }).click();
   await expect(page.getByRole('status')).toContainText(/download/i);
   // Some browsers can fail PNG encoding with a null blob.
   await page.evaluate(() => {
     HTMLCanvasElement.prototype.toBlob = callback => callback(null);
   });
-  await page.getByRole('button', { name: 'Copy to Clipboard' }).click();
+  await page.getByRole('button', { name: 'Copy image' }).click();
   await expect(page.getByRole('status')).toContainText(/download/i);
   expect(errors).toEqual([]);
 });
