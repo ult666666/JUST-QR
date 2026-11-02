@@ -194,7 +194,7 @@ async function copyPNG() {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     showToast('Copied to clipboard');
   } catch {
-    showToast('Copy failed. Try download instead.');
+    showToast('Could not copy the image. Use Download PNG instead.');
   }
 }
 
