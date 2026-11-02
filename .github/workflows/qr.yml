@@ -1,4 +1,4 @@
-name: QR browser checks
+name: QR checks
 
 on:
   push:
@@ -28,5 +28,5 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Install headless Chromium and system dependencies
         run: npx playwright install --with-deps chromium --only-shell
-      - name: Run QR browser scenarios
+      - name: Run encoder, differential and browser tests
         run: npm test
